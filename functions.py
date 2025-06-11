@@ -8,18 +8,38 @@ def load_all_sheets(file_path):
         data[sheet.strip()] = df.dropna(how='all')
     return data
 
+
 def extract_pf_matrix_from_df(df):
+    # Satır 3 (index=2) başlık satırı
+    df.columns = df.iloc[2]
+    df = df[3:].reset_index(drop=True)
+
     matrix = {}
     for i, row in df.iterrows():
-        alt_name = row[0]
+        alt_name = str(row.iloc[0]).strip()
+
+        # Alternatif adı geçersizse atla
+        if not alt_name or alt_name.lower().startswith("step") or alt_name.lower() == "none":
+            continue
+
         matrix[alt_name] = {}
-        for j in range(1, len(row), 3):
-            crit = df.columns[j].strip()
-            rho = row[j]
-            rho_bar = row[j+1]
-            sigma = row[j+2]
-            matrix[alt_name][crit] = (rho, rho_bar, sigma)
+
+        for j in range(1, len(row) - 2, 3):  # 3'erli bloklar
+            crit = str(df.columns[j]).strip()
+            try:
+                rho = float(row.iloc[j])
+                rho_bar = float(row.iloc[j + 1])
+                sigma = float(row.iloc[j + 2])
+
+                if pd.isna(rho) or pd.isna(rho_bar) or pd.isna(sigma):
+                    continue
+
+                matrix[alt_name][crit] = (rho, rho_bar, sigma)
+            except Exception as e:
+                continue  # Boş/hatalı değer varsa pas geç
+
     return matrix
+ 
 
 def pf_score(pf):
     return pf[0] - pf[2]
