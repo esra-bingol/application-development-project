@@ -43,24 +43,50 @@ def manual_input_mode():
             sigma = st.number_input(f"σ (Neutral)", 0.0, 1.0, 0.2, 0.01, key=f"sigma_{i}_{j}")
             manual_pf_matrix[alt_name][crit] = (rho, rho_bar, sigma)
 
-    # Step 4
+    # Score function
     def pf_score(pf):
-        return pf[0] - pf[2]
+        return pf[0] - pf[2]  # ρ - σ
 
+    # Compute results
     def compute_manual_scores(pf_matrix, weights):
         alt_scores = {}
+        detailed_scores = {}
+
         for alt in pf_matrix:
             total = 0
+            details = []
             for i, crit in enumerate(pf_matrix[alt]):
                 w = weights[i]
-                s = pf_score(pf_matrix[alt][crit])
-                total += w * s
+                pf = pf_matrix[alt][crit]
+                score = pf_score(pf)
+                weighted_score = w * score
+                total += weighted_score
+                details.append((crit, weighted_score))
             alt_scores[alt] = total
-        return dict(sorted(alt_scores.items(), key=lambda x: x[1], reverse=True))
+            detailed_scores[alt] = details
 
-    # Step 5
+        return dict(sorted(alt_scores.items(), key=lambda x: x[1], reverse=True)), detailed_scores
+
+    # Step 4 - Trigger
     if st.button("Compute Ranking"):
-        result = compute_manual_scores(manual_pf_matrix, criteria_weights)
+        result, details = compute_manual_scores(manual_pf_matrix, criteria_weights)
         st.success("✅ Ranking Computed!")
+
+        # Show main scores
+        st.markdown("### 🧮 Final Scores")
         st.write(result)
-        st.bar_chart(pd.Series(result))
+
+        # Bar chart with proper labels
+        st.markdown("### 📊 Score Bar Chart (Manual Entry)")
+        df_scores = pd.DataFrame(list(result.items()), columns=["Alternative", "Score"])
+        st.bar_chart(df_scores.set_index("Alternative"))
+
+        # Show contributions
+        for alt in details:
+            st.markdown(f"#### 🔍 Criterion Contributions for `{alt}`")
+            df = pd.DataFrame(details[alt], columns=["Criterion", "Weighted Score"])
+            df = df.sort_values(by="Weighted Score", ascending=False).reset_index(drop=True)
+            st.table(df)
+
+            top_crit = df.iloc[0]
+            st.success(f"🏆 Most impactful criterion: **{top_crit['Criterion']}** (Score: {top_crit['Weighted Score']:.3f})")

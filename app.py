@@ -1,66 +1,131 @@
 import streamlit as st
 import pandas as pd
-
 from functions import (
     extract_pf_matrix_from_df,
     compute_criteria_weights_from_pf,
     compute_alternative_scores_pf,
-    pf_score,
-    load_all_sheets
+    load_all_sheets,
 )
+from manual_input import manual_input_mode
 
+# ----------------- Sayfa ayarları -----------------
 st.set_page_config(page_title="PF-WENSLO-ARLON Decision Support System", layout="wide")
-st.title("PF-WENSLO-ARLON Decision Support System")
 
-# --- Input mode selection
-mode = st.radio("Select your input method:", ["📄 Upload from Excel", "✍️ Manual Entry"])
+st.markdown("""
+<style>
+    .main { background-color: #1E1E2F; color: white; }
+    h1, h2, h3 { color: #FFBF00; }
+    .stRadio > div { background: #333; color: white; border-radius: 5px; padding: 5px; }
+</style>
+""", unsafe_allow_html=True)
 
+# ----------------- Header -----------------
+st.markdown("""
+<h1 style='text-align:center; color:#FFBF00;'>🛡️ PF-WENSLO-ARLON Decision Support System</h1>
+<p style='font-size:18px; text-align:justify; color:white;'>
+Welcome to our intelligent decision support system developed to tackle complex challenges in the field of <b>Occupational Health & Safety</b>. 
+<br><br>
+This tool employs the <b style="color:#FFD700;">PF-WENSLO + ARLON</b> methodology to analyze and rank potential risk factors with precision and transparency.
+It supports evidence-based decision-making through advanced multi-criteria evaluation techniques.
+</p>
+""", unsafe_allow_html=True)
+
+
+# ----------------- Girdi Modu -----------------
+mode = st.radio("**Select your input method:**", ["📄 Upload from Excel", "✍️ Manual Entry"])
+
+# ----------------- Excel Yükleme Modu -----------------
 if mode == "📄 Upload from Excel":
     uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
     if uploaded_file:
         all_data = load_all_sheets(uploaded_file)
 
-        # Sheet selection
         selected_sheet = st.selectbox("Select Sheet to Preview", list(all_data.keys()))
         st.write("Preview of Selected Sheet")
         st.dataframe(all_data[selected_sheet])
 
-        # TABLE sheet processing
-        if "TABLE" in all_data:
-            st.subheader("📊 PF Decision Matrix (from TABLE)")
-            df_table = all_data["TABLE"]
+        if selected_sheet in all_data:
+            st.markdown("### 📊 PF Decision Matrix")
+            df_table = all_data[selected_sheet]
             pf_matrix = extract_pf_matrix_from_df(df_table)
 
-            # Collect all unique criteria
+            # Kriterleri çıkar ve listele
             criteria = set()
             for alt in pf_matrix.values():
                 criteria.update(alt.keys())
             criteria = list(criteria)
 
-            # Aggregate PF values by criterion
+            st.markdown("### 📌 Criteria Used")
+            st.write(criteria)
+
+            # Ağırlık ve skor hesapla
             dummy_pf_dict = {
                 crit: [pf_matrix[alt][crit] for alt in pf_matrix if crit in pf_matrix[alt]]
                 for crit in criteria
             }
 
-            # Compute weights and final scores
             weights = compute_criteria_weights_from_pf(dummy_pf_dict)
             alt_scores = compute_alternative_scores_pf(pf_matrix, weights)
 
             st.markdown("### ⚖️ Computed Criteria Weights")
-            st.json(weights)
+            st.dataframe(pd.DataFrame(weights.items(), columns=["Criterion", "Weight"]))
 
+            # Alternatif puanlarını sırala ve göster
             st.markdown("### 🏁 Final Alternative Rankings")
-            st.json(alt_scores)
+            sorted_scores = sorted(alt_scores.items(), key=lambda x: x[1], reverse=True)
+            ranking_df = pd.DataFrame(sorted_scores, columns=["Alternative", "Score"])
+            st.dataframe(ranking_df)
 
-            # Display additional STEP sheets
-            st.markdown("---")
-            st.markdown("### 📄 Additional STEP Pages")
-            for step in [s for s in all_data if s.startswith("STEP")]:
-                with st.expander(f"🔍 View {step}"):
-                    st.dataframe(all_data[step])
+            best = ranking_df.iloc[0]
+            st.success(f"🏆 Best Ranked Alternative: **{best['Alternative']}** (Score: {best['Score']:.4f})")
+            # 📌 Top 3 Alternatives Table
+            top_3_df = ranking_df.head(3).copy()
+            top_3_df.index = [1, 2, 3]
+            emoji_rank = {1: "🥇", 2: "🥈", 3: "🥉"}
+            top_3_df.insert(0, "Rank", top_3_df.index.map(emoji_rank))
 
+            st.markdown("### 🥇 Top 3 Alternatives Based on Model Results")
+            st.dataframe(top_3_df, use_container_width=True)
+
+
+            st.markdown("### 📊 Bar Chart of Scores")
+            st.bar_chart(ranking_df.set_index("Alternative")["Score"])
+
+            if selected_sheet == "SAYFA 11":
+                st.markdown("---")
+                st.markdown("### 🏆 Top 5 Alternatives from Model Results")
+
+                # Alternatif isimlerini eşleştir (A kolonundaki A1, A2 vs ile açıklama)
+                alt_names = all_data["SAYFA 11"].iloc[:, [3, 1]].dropna()
+                alt_names.columns = ["Alternative", "Name"]
+                alt_names["Alternative"] = alt_names["Alternative"].astype(str)
+
+                top_5_model = ranking_df.head(5).copy()
+                top_5_model["Alternative"] = top_5_model["Alternative"].astype(str)
+
+                top_5_model_named = pd.merge(top_5_model, alt_names, on="Alternative", how="left")
+                top_5_model_named = top_5_model_named[["Alternative", "Name", "Score"]]
+
+                # Tabloyu göster
+                st.dataframe(top_5_model_named)
+
+
+
+                st.markdown("---")
+                st.markdown("### 🧾 Top 5 Based on Survey Sheet (Excel Ranking)")
+
+                sayfa11_df = all_data["SAYFA 11"]
+                top5_from_excel = sayfa11_df.iloc[:, [0, 1]].copy()
+                top5_from_excel.columns = ["Rank", "Description"]
+                top5_from_excel = top5_from_excel.dropna()
+                top5_from_excel["Rank"] = pd.to_numeric(top5_from_excel["Rank"], errors="coerce")
+                top5_from_excel = top5_from_excel[top5_from_excel["Rank"] <= 5].sort_values("Rank")
+
+                st.dataframe(top5_from_excel)
+
+                st.markdown("📌 This table shows the top 5 criteria as ranked by survey participants in the Excel sheet.")
+
+# ----------------- Manuel Giriş -----------------
 elif mode == "✍️ Manual Entry":
-    from manual_input import manual_input_mode
     manual_input_mode()
