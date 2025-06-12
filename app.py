@@ -8,31 +8,44 @@ from functions import (
 )
 from manual_input import manual_input_mode
 
-# ----------------- Sayfa ayarları -----------------
 st.set_page_config(page_title="PF-WENSLO-ARLON Decision Support System", layout="wide")
 
 st.markdown("""
 <style>
-    .main { background-color: #1E1E2F; color: white; }
-    h1, h2, h3 { color: #FFBF00; }
-    .stRadio > div { background: #333; color: white; border-radius: 5px; padding: 5px; }
+    h1 {
+        text-align: center;
+        color: #FFBF00;
+        font-size: 42px;
+        font-weight: 800;
+    }
+    .subtitle {
+        text-align: center;
+        font-size: 18px;
+        color: #444;
+        padding-top: 10px;
+        margin-bottom: 25px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- Header -----------------
+
+st.markdown("<h1>🛡️ PF-WENSLO-ARLON Decision Support System</h1>", unsafe_allow_html=True)
+
 st.markdown("""
-<h1 style='text-align:center; color:#FFBF00;'>🛡️ PF-WENSLO-ARLON Decision Support System</h1>
-<p style='font-size:18px; text-align:justify; color:white;'>
-Welcome to our intelligent decision support system developed to tackle complex challenges in the field of <b>Occupational Health & Safety</b>. 
-<br><br>
-This tool employs the <b style="color:#FFD700;">PF-WENSLO + ARLON</b> methodology to analyze and rank potential risk factors with precision and transparency.
-It supports evidence-based decision-making through advanced multi-criteria evaluation techniques.
-</p>
+<div class='subtitle'>
+Welcome to our intelligent decision support system built to address complex <b>Occupational Health & Safety</b> challenges.
+<br>This tool utilizes the <b style="color:#f4aa00;">PF-WENSLO + ARLON</b> methodology to <br>analyze and rank risk factors with precision, transparency, and advanced multi-criteria evaluation.
+</div>
 """, unsafe_allow_html=True)
 
 
-# ----------------- Girdi Modu -----------------
-mode = st.radio("**Select your input method:**", ["📄 Upload from Excel", "✍️ Manual Entry"])
+st.markdown("### 🛠️ Select your input method:")
+mode = st.radio(
+    label="Choose input mode",
+    options=["📄 Upload from Excel", "✍️ Manual Entry"],
+    index=0,
+    label_visibility="visible"  
+)
 
 # ----------------- Excel Yükleme Modu -----------------
 if mode == "📄 Upload from Excel":
